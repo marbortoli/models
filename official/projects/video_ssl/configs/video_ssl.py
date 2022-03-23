@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """Video classification configuration definition."""
 
 
@@ -20,8 +19,8 @@ import dataclasses
 
 from official.core import config_definitions as cfg
 from official.core import exp_factory
-from official.vision.beta.configs import common
-from official.vision.beta.configs import video_classification
+from official.vision.configs import common
+from official.vision.configs import video_classification
 
 
 Losses = video_classification.Losses

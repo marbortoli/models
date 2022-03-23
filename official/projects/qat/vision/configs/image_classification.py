@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """Image classification configuration definition."""
 
 import dataclasses
@@ -21,7 +20,7 @@ from typing import Optional
 from official.core import config_definitions as cfg
 from official.core import exp_factory
 from official.projects.qat.vision.configs import common
-from official.vision.beta.configs import image_classification
+from official.vision.configs import image_classification
 
 
 @dataclasses.dataclass

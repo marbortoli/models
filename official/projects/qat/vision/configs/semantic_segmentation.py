@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """RetinaNet configuration definition."""
 import dataclasses
 from typing import Optional
@@ -20,7 +19,7 @@ from typing import Optional
 from official.core import config_definitions as cfg
 from official.core import exp_factory
 from official.projects.qat.vision.configs import common
-from official.vision.beta.configs import semantic_segmentation
+from official.vision.configs import semantic_segmentation
 
 
 @dataclasses.dataclass

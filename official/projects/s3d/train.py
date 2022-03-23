@@ -12,21 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """TensorFlow Model Garden Vision training driver for S3D."""
 
 from absl import app
 
-# pylint: disable=unused-import
-from official.common import registry_imports
-# pylint: enable=unused-import
 from official.common import flags as tfm_flags
 # pylint: disable=unused-import
 from official.projects.s3d.configs.google import s3d as s3d_config
 from official.projects.s3d.modeling import s3d
 from official.projects.s3d.tasks.google import automl_video_classification
+from official.vision import registry_imports
 # pylint: enable=unused-import
-from official.vision.beta import train
+from official.vision import train
 
 if __name__ == '__main__':
   tfm_flags.define_flags()

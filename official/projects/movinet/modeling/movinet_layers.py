@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """Contains common building blocks for MoViNets.
 
 Reference: https://arxiv.org/pdf/2103.11511.pdf
@@ -23,7 +22,7 @@ from typing import Any, Mapping, Optional, Sequence, Tuple, Union
 import tensorflow as tf
 
 from official.modeling import tf_utils
-from official.vision.beta.modeling.layers import nn_layers
+from official.vision.modeling.layers import nn_layers
 
 # Default kernel weight decay that may be overridden
 KERNEL_WEIGHT_DECAY = 1.5e-5

@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """Contains modules related to Inception networks."""
 from typing import Callable, Dict, Optional, Sequence, Set, Text, Tuple, Type, Union
 
 import tensorflow as tf
 
 from official.projects.s3d.modeling import net_utils
-from official.vision.beta.modeling.layers import nn_blocks_3d
+from official.vision.modeling.layers import nn_blocks_3d
 
 INCEPTION_V1_CONV_ENDPOINTS = [
     'Conv2d_1a_7x7', 'Conv2d_2c_3x3', 'Mixed_3b', 'Mixed_3c', 'Mixed_4b',

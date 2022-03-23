@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """VisionTransformer models."""
 import tensorflow as tf
 
 from official.modeling import activations
 from official.projects.vit.modeling import nn_blocks
-from official.vision.beta.modeling.backbones import factory
-from official.vision.beta.modeling.layers import nn_layers
+from official.vision.modeling.backbones import factory
+from official.vision.modeling.layers import nn_layers
 
 
 layers = tf.keras.layers

@@ -1004,6 +1004,7 @@ class T5TransformerParams:
   num_heads: int
   d_ff: int
   vocab_size: int
+  target_vocab_size: Optional[int] = None
   dropout_rate: float = 0.0
   layer_norm_epsilon: float = 1e-6
   shared_embedding: bool = False
@@ -1087,16 +1088,17 @@ class Encoder(Module):
 
   @tf.Module.with_name_scope
   def __call__(self,
-               inputs,
+               inputs=None,
                encoder_mask=None,
                dense_inputs=None,
                training=False):
     """Applies Transformer model on the inputs.
 
     Args:
-      inputs: input data
+      inputs: input word ids. Optional if dense data are provided.
       encoder_mask: the encoder self-attention mask.
-      dense_inputs: dense input data, concat after the embedding.
+      dense_inputs: dense input data. Concat after the embedding if word ids
+        are provided.
       training: whether it is training pass, affecting dropouts.
 
     Returns:
@@ -1106,16 +1108,27 @@ class Encoder(Module):
     if encoder_mask is not None:
       encoder_mask = tf.cast(encoder_mask, self.compute_dtype)
     cfg = self.config
-    x = self.input_embed(inputs, one_hot=cfg.one_hot_embedding)
+    inputs_array = []
+    if inputs is not None:
+      inputs_array.append(
+          self.input_embed(inputs, one_hot=cfg.one_hot_embedding))
     if dense_inputs is not None:
-      x = tf.concat([x, dense_inputs], axis=1)
+      inputs_array.append(dense_inputs)
+    if not inputs_array:
+      raise ValueError("At least one of inputs and dense_inputs must not be "
+                       "None.")
+    x = tf.concat(inputs_array, axis=1)
     tensor_shape = tf_utils.get_shape_list(x)
     tensor_shape[-2] = 1
     x = self.input_dropout(x, noise_shape=tensor_shape, training=training)
-    input_length = tf_utils.get_shape_list(inputs)[1]
+    if inputs is not None:
+      input_length = tf_utils.get_shape_list(inputs)[1]
+    else:
+      input_length = 0
     position_bias = self.relative_embedding(input_length, input_length)
     if dense_inputs is not None:
       # Here we ignore relative position bias for dense embeddings.
+      # TODO(yejiayu): If we proceed to video use cases, rework this part.
       dense_input_length = tf_utils.get_shape_list(dense_inputs)[1]
       # Position bias shape: [batch, 1, len, len]
       paddings = tf.constant([[0, 0], [0, 0], [0, dense_input_length],
@@ -1147,11 +1160,15 @@ class Decoder(Module):
     self.compute_dtype = compute_dtype
     if self.config.num_decoder_layers is None:
       self.config.num_decoder_layers = self.config.num_layers
+    if not hasattr(
+        self.config,
+        "target_vocab_size") or self.config.target_vocab_size is None:
+      self.config.target_vocab_size = self.config.vocab_size
     with self.name_scope:
       # Target Embedding.
       if shared_embedding is None:
         self.target_embed = Embed(
-            vocab_size=self.config.vocab_size,
+            vocab_size=self.config.target_vocab_size,
             features=self.config.d_model,
             embeddings_initializer=self.config.vocab_embeddings_initializer,
             dtype=self.dtype,
@@ -1199,7 +1216,7 @@ class Decoder(Module):
       if not self.config.logits_via_embedding:
         self.logits_dense = Linear(
             in_features=self.config.d_model,
-            out_features=self.config.vocab_size,
+            out_features=self.config.target_vocab_size,
             use_bias=False,
             dtype=self.dtype,
             name="logits")
@@ -1222,7 +1239,7 @@ class Decoder(Module):
       encoded: the encoder outputs.
       decoder_mask: the decoder self-attention mask.
       encoder_decoder_mask: the cross-attention mask.
-      decode: Whether to perform autoaggressive decoding.
+      decode: Whether to perform autoregressive decoding.
       decode_position: integer, the position to decode.
       cache: The cache dictionary of key, value tensors.
       max_decode_len: An optional integer specifying the maximum decoding
@@ -1320,25 +1337,35 @@ class T5Transformer(Module):
           compute_dtype=self.compute_dtype)
 
   def encode(self,
-             encoder_input_tokens,
+             encoder_input_tokens=None,
              encoder_segment_ids=None,
              encoder_dense_inputs=None,
              encoder_dense_segment_ids=None,
              training=False):
-    eligible_positions = tf.cast(
-        tf.not_equal(encoder_input_tokens, 0), self.compute_dtype)
+    eligible_position_array = []
+    if encoder_input_tokens is not None:
+      eligible_position_array.append(
+          tf.cast(tf.not_equal(encoder_input_tokens, 0), self.compute_dtype))
     if encoder_dense_inputs is not None:
-      eligible_dense_position = tf.cast(
+      eligible_dense_positions = tf.cast(
           tf.reduce_any(tf.not_equal(encoder_dense_inputs, 0), axis=-1),
           self.compute_dtype)
-      eligible_positions = tf.concat(
-          [eligible_positions, eligible_dense_position], axis=1)
+      eligible_position_array.append(eligible_dense_positions)
+    if not eligible_position_array:
+      raise ValueError("At least one of encoder_input_tokens and"
+                       " encoder_dense_inputs must be provided.")
+
+    eligible_positions = tf.concat(eligible_position_array, axis=1)
     encoder_mask = make_attention_mask(
         eligible_positions, eligible_positions, dtype=tf.bool)
+
+    encoder_segment_id_array = []
     if encoder_segment_ids is not None:
-      if encoder_dense_segment_ids is not None:
-        encoder_segment_ids = tf.concat(
-            [encoder_segment_ids, encoder_dense_segment_ids], axis=1)
+      encoder_segment_id_array.append(encoder_segment_ids)
+    if encoder_dense_segment_ids is not None:
+      encoder_segment_id_array.append(encoder_dense_segment_ids)
+    if encoder_segment_id_array:
+      encoder_segment_ids = tf.concat(encoder_segment_id_array, axis=1)
       segment_mask = make_attention_mask(
           encoder_segment_ids, encoder_segment_ids, tf.equal, dtype=tf.bool)
       encoder_mask = tf.math.logical_and(encoder_mask, segment_mask)
@@ -1353,7 +1380,7 @@ class T5Transformer(Module):
       self,
       encoded,
       decoder_target_tokens,
-      encoder_input_tokens,  # only used for masks
+      encoder_input_tokens=None,  # only used for masks
       encoder_dense_inputs=None,
       decoder_input_tokens=None,
       encoder_segment_ids=None,
@@ -1364,14 +1391,18 @@ class T5Transformer(Module):
       max_decode_len=None,
       decode=False,
       training=False):
-    eligible_inputs = tf.cast(
-        tf.not_equal(encoder_input_tokens, 0), self.compute_dtype)
+    eligible_inputs_array = []
+    if encoder_input_tokens is not None:
+      eligible_inputs = tf.cast(
+          tf.not_equal(encoder_input_tokens, 0), self.compute_dtype)
+      eligible_inputs_array.append(eligible_inputs)
     if encoder_dense_inputs is not None:
       eligible_dense_inputs = tf.cast(
           tf.reduce_any(tf.not_equal(encoder_dense_inputs, 0), axis=-1),
           self.compute_dtype)
-      eligible_inputs = tf.concat([eligible_inputs, eligible_dense_inputs],
-                                  axis=1)
+      eligible_inputs_array.append(eligible_dense_inputs)
+    eligible_inputs = tf.concat(eligible_inputs_array, axis=1)
+
     if decode:
       # For decoding, the decoder_input_tokens is the decoder_target_tokens.
       decoder_input_tokens = decoder_target_tokens
@@ -1430,8 +1461,8 @@ class T5Transformer(Module):
 
   @tf.Module.with_name_scope
   def __call__(self,
-               encoder_input_tokens,
-               decoder_target_tokens,
+               encoder_input_tokens=None,
+               decoder_target_tokens=None,
                encoder_dense_inputs=None,
                encoder_dense_segment_ids=None,
                decoder_input_tokens=None,
@@ -1456,7 +1487,7 @@ class T5Transformer(Module):
       a dictionary of logits/cache.
     """
     encoded = self.encode(
-        encoder_input_tokens,
+        encoder_input_tokens=encoder_input_tokens,
         encoder_segment_ids=encoder_segment_ids,
         encoder_dense_inputs=encoder_dense_inputs,
         encoder_dense_segment_ids=encoder_dense_segment_ids,

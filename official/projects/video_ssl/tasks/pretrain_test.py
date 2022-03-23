@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 
 import functools
 import os
@@ -22,13 +21,13 @@ import orbit
 import tensorflow as tf
 
 # pylint: disable=unused-import
+from official import vision
 from official.core import exp_factory
 from official.core import task_factory
 from official.modeling import optimization
 from official.projects.video_ssl.tasks import pretrain
-from official.vision import beta
-from official.vision.beta.dataloaders import tfexample_utils
-# pylint: disable=unused-import
+from official.vision.dataloaders import tfexample_utils
+# pylint: enable=unused-import
 
 
 class VideoClassificationTaskTest(tf.test.TestCase):

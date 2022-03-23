@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """Training driver."""
 
 from absl import app
@@ -20,7 +19,6 @@ from absl import flags
 import gin
 
 # pylint: disable=unused-import
-from official.common import registry_imports
 from official.common import distribute_utils
 from official.common import flags as tfm_flags
 from official.core import task_factory
@@ -30,6 +28,7 @@ from official.modeling import performance
 from official.projects.video_ssl.modeling import video_ssl_model
 from official.projects.video_ssl.tasks import linear_eval
 from official.projects.video_ssl.tasks.google import pretrain
+from official.vision import registry_imports
 # pylint: disable=unused-import
 
 FLAGS = flags.FLAGS

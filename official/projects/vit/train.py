@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """TensorFlow Model Garden Vision training driver, including ViT configs.."""
 
 from absl import app
@@ -20,7 +19,7 @@ from absl import app
 from official.common import flags as tfm_flags
 from official.projects.vit import configs  # pylint: disable=unused-import
 from official.projects.vit.modeling import vit  # pylint: disable=unused-import
-from official.vision.beta import train
+from official.vision import train
 
 
 if __name__ == '__main__':

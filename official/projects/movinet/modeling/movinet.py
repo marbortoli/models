@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """Contains definitions of Mobile Video Networks.
 
 Reference: https://arxiv.org/pdf/2103.11511.pdf
@@ -25,7 +24,7 @@ import tensorflow as tf
 
 from official.modeling import hyperparams
 from official.projects.movinet.modeling import movinet_layers
-from official.vision.beta.modeling.backbones import factory
+from official.vision.modeling.backbones import factory
 
 # Defines a set of kernel sizes and stride sizes to simplify and shorten
 # architecture definitions for configs below.
