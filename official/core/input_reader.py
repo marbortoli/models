@@ -160,22 +160,44 @@ def _read_tfds(tfds_builder: tfds.core.DatasetBuilder,
   """Reads a dataset from tfds."""
   # No op if exist.
   tfds_builder.download_and_prepare()
-
-  read_config = tfds.ReadConfig(
-      interleave_cycle_length=cycle_length,
-      interleave_block_length=block_length,
-      input_context=input_context,
-      shuffle_seed=seed)
   decoders = {}
   if tfds_skip_decoding_feature:
     for skip_feature in tfds_skip_decoding_feature.split(','):
       decoders[skip_feature.strip()] = tfds.decode.SkipDecoding()
-  dataset = tfds_builder.as_dataset(
-      split=tfds_split,
-      shuffle_files=is_training,
-      as_supervised=tfds_as_supervised,
-      decoders=decoders,
-      read_config=read_config)
+  if tfds_builder.info.splits:
+    num_shards = len(tfds_builder.info.splits[tfds_split].file_instructions)
+  else:
+    # The tfds mock path often does not provide splits.
+    num_shards = 1
+  if input_context and num_shards < input_context.num_input_pipelines:
+    # The number of files in the dataset split is smaller than the number of
+    # input pipelines. We read the entire dataset first and then shard in the
+    # host memory.
+    read_config = tfds.ReadConfig(
+        interleave_cycle_length=cycle_length,
+        interleave_block_length=block_length,
+        input_context=None,
+        shuffle_seed=seed)
+    dataset = tfds_builder.as_dataset(
+        split=tfds_split,
+        shuffle_files=is_training,
+        as_supervised=tfds_as_supervised,
+        decoders=decoders,
+        read_config=read_config)
+    dataset = dataset.shard(input_context.num_input_pipelines,
+                            input_context.input_pipeline_id)
+  else:
+    read_config = tfds.ReadConfig(
+        interleave_cycle_length=cycle_length,
+        interleave_block_length=block_length,
+        input_context=input_context,
+        shuffle_seed=seed)
+    dataset = tfds_builder.as_dataset(
+        split=tfds_split,
+        shuffle_files=is_training,
+        as_supervised=tfds_as_supervised,
+        decoders=decoders,
+        read_config=read_config)
 
   if is_training and not cache:
     dataset = dataset.repeat()
@@ -270,6 +292,8 @@ class InputReader:
     self._transform_and_batch_fn = transform_and_batch_fn
     self._postprocess_fn = postprocess_fn
     self._seed = params.seed
+    self._prefetch_buffer_size = (params.prefetch_buffer_size or
+                                  tf.data.experimental.AUTOTUNE)
 
     # When tf.data service is enabled, each data service worker should get
     # different random seeds. Thus, we set `seed` to None.
@@ -483,4 +507,4 @@ class InputReader:
       options = tf.data.Options()
       options.experimental_deterministic = self._deterministic
       dataset = dataset.with_options(options)
-    return dataset.prefetch(tf.data.experimental.AUTOTUNE)
+    return dataset.prefetch(self._prefetch_buffer_size)
