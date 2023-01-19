@@ -1,0 +1,60 @@
+item {
+    name: "compressor",
+    id: 1,
+    display_name: "compressor"
+}
+item {
+    name: "energymeter",
+    id: 2,
+    display_name: "energymeter"
+}
+item {
+    name: "fan",
+    id: 3,
+    display_name: "fan"
+}
+item {
+    name: "flowmeter",
+    id: 4,
+    display_name: "flowmeter"
+}
+item {
+    name: "heat exchanger",
+    id: 5,
+    display_name: "heat exchanger"
+}
+item {
+    name: "pipeline direction",
+    id: 6,
+    display_name: "pipeline direction"
+}
+item {
+    name: "pump",
+    id: 7,
+    display_name: "pump"
+}
+item {
+    name: "sensor",
+    id: 8,
+    display_name: "sensor"
+}
+item {
+    name: "tank",
+    id: 9,
+    display_name: "tank"
+}
+item {
+    name: "valve",
+    id: 10,
+    display_name: "valve"
+}
+item {
+    name: "valve0",
+    id: 11,
+    display_name: "valve0"
+}
+item {
+    name: "valve3",
+    id: 12,
+    display_name: "valve3"
+}
