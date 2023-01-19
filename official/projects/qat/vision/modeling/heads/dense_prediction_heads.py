@@ -54,7 +54,7 @@ class SeparableConv2DQuantized(tf.keras.layers.Layer):
     depthwise_conv2d_quantized = helper.quantize_wrapped_layer(
         tf.keras.layers.DepthwiseConv2D,
         configs.Default8BitConvQuantizeConfig(
-            ['depthwise_kernel'], ['activation'], True))
+            ['depthwise_kernel'], [], True))
     conv2d_quantized = helper.quantize_wrapped_layer(
         tf.keras.layers.Conv2D,
         configs.Default8BitConvQuantizeConfig(
@@ -64,6 +64,10 @@ class SeparableConv2DQuantized(tf.keras.layers.Layer):
     # Depthwise conv input filters is always equal to output filters.
     # This filters argument only needed for the point-wise conv2d op.
     del dwconv_kwargs['filters']
+    dwconv_kwargs.update({
+        'activation': None,
+        'use_bias': False,
+    })
     self.dw_conv = depthwise_conv2d_quantized(name='dw', **dwconv_kwargs)
 
     conv_kwargs = self._conv_kwargs.copy()
@@ -120,6 +124,7 @@ class RetinaNetHeadQuantized(tf.keras.layers.Layer):
       kernel_regularizer: Optional[tf.keras.regularizers.Regularizer] = None,
       bias_regularizer: Optional[tf.keras.regularizers.Regularizer] = None,
       num_params_per_anchor: int = 4,
+      share_classification_heads: bool = False,
       **kwargs):
     """Initializes a RetinaNet quantized head.
 
@@ -152,8 +157,13 @@ class RetinaNetHeadQuantized(tf.keras.layers.Layer):
         box. For example, `num_params_per_anchor` would be 4 for axis-aligned
         anchor boxes specified by their y-centers, x-centers, heights, and
         widths.
+      share_classification_heads: A `bool` that indicates whethere
+        sharing weights among the main and attribute classification heads. Not
+        used in the QAT model.
       **kwargs: Additional keyword arguments to be passed.
     """
+    del share_classification_heads
+
     super().__init__(**kwargs)
     self._config_dict = {
         'min_level': min_level,
@@ -407,15 +417,31 @@ class RetinaNetHeadQuantized(tf.keras.layers.Layer):
 
       # attribute nets.
       if self._config_dict['attribute_heads']:
+        prediction_tower_output = {}
         for att_config in self._config_dict['attribute_heads']:
           att_name = att_config['name']
-          x = this_level_features
-          for conv, norm in zip(self._att_convs[att_name],
-                                self._att_norms[att_name][i]):
-            x = conv(x)
-            x = norm(x)
-            x = self._activation(x)
-          attributes[att_name][str(level)] = self._att_predictors[att_name](x)
+
+          def build_prediction_tower(atttribute_name, features, feature_level):
+            x = features
+            for conv, norm in zip(
+                self._att_convs[atttribute_name],
+                self._att_norms[atttribute_name][feature_level]):
+              x = conv(x)
+              x = norm(x)
+              x = self._activation(x)
+            return x
+
+          prediction_tower_name = att_config['prediction_tower_name']
+          if not prediction_tower_name:
+            attributes[att_name][str(level)] = self._att_predictors[att_name](
+                build_prediction_tower(att_name, this_level_features, i))
+          else:
+            if prediction_tower_name not in prediction_tower_output:
+              prediction_tower_output[
+                  prediction_tower_name] = build_prediction_tower(
+                      att_name, this_level_features, i)
+            attributes[att_name][str(level)] = self._att_predictors[att_name](
+                prediction_tower_output[prediction_tower_name])
 
     return scores, boxes, attributes
 
@@ -425,4 +451,3 @@ class RetinaNetHeadQuantized(tf.keras.layers.Layer):
   @classmethod
   def from_config(cls, config):
     return cls(**config)
-
